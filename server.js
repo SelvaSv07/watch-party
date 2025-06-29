@@ -4,7 +4,7 @@ const next = require("next");
 const { Server } = require("socket.io");
 
 const dev = process.env.NODE_ENV !== "production";
-const hostname = "localhost";
+const hostname = "0.0.0.0";
 const port = process.env.PORT || 3000;
 
 const app = next({ dev, hostname, port });
@@ -20,9 +20,15 @@ app.prepare().then(() => {
 
   const io = new Server(server, {
     cors: {
-      origin: "*",
+      origin:
+        process.env.NODE_ENV === "production"
+          ? true // Allow all origins in production for Render
+          : "*",
       methods: ["GET", "POST"],
+      credentials: true,
     },
+    allowEIO3: true,
+    transports: ["websocket", "polling"],
   });
 
   io.on("connection", (socket) => {
@@ -106,7 +112,7 @@ app.prepare().then(() => {
     });
   });
 
-  server.listen(port, (err) => {
+  server.listen(port, hostname, (err) => {
     if (err) throw err;
     console.log(`> Ready on http://${hostname}:${port}`);
   });
