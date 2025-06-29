@@ -2,11 +2,10 @@
   "name": "watch-party-platform",
   "version": "0.1.0",
   "description": "Real-time watch party platform",
-  "main": "server.js",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "next dev",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {

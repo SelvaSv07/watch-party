@@ -7,6 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+// Replace this with your Socket.IO server URL
+const SOCKET_SERVER_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  "https://your-socketio-server.onrender.com";
+
 export default function Room() {
   const { roomId } = useParams();
   const [socket, setSocket] = useState(null);
@@ -20,18 +25,35 @@ export default function Room() {
   const [isHost, setIsHost] = useState(false);
   const [screenStream, setScreenStream] = useState(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [connectionError, setConnectionError] = useState(false);
 
   const videoRef = useRef(null);
   const screenVideoRef = useRef(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const socketInstance = io();
+    // Connect to external Socket.IO server
+    const socketInstance = io(SOCKET_SERVER_URL, {
+      transports: ["websocket", "polling"],
+      timeout: 20000,
+    });
+
     setSocket(socketInstance);
 
     socketInstance.on("connect", () => {
       setIsConnected(true);
+      setConnectionError(false);
       socketInstance.emit("join-room", roomId);
+    });
+
+    socketInstance.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
+      setConnectionError(true);
+      setIsConnected(false);
+    });
+
+    socketInstance.on("disconnect", () => {
+      setIsConnected(false);
     });
 
     socketInstance.on("room-joined", (data) => {
@@ -128,7 +150,6 @@ export default function Room() {
         screenVideoRef.current.srcObject = stream;
       }
 
-      // Stop screen sharing when user stops it from browser
       stream.getVideoTracks()[0].onended = () => {
         stopScreenShare();
       };
@@ -153,7 +174,7 @@ export default function Room() {
     if (url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) return "image";
     if (url.includes("youtube.com") || url.includes("youtu.be"))
       return "youtube";
-    return "video"; // default
+    return "video";
   };
 
   const getYouTubeEmbedUrl = (url) => {
@@ -163,6 +184,30 @@ export default function Room() {
     return videoId ? `https://www.youtube.com/embed/${videoId[1]}` : url;
   };
 
+  if (connectionError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-semibold text-red-600 mb-2">
+              Connection Error
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Unable to connect to the watch party server. Please check your
+              internet connection and try again.
+            </p>
+            <p className="text-sm text-gray-500">
+              Server URL: {SOCKET_SERVER_URL}
+            </p>
+            <Button onClick={() => window.location.reload()} className="mt-4">
+              Retry Connection
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
@@ -170,9 +215,14 @@ export default function Room() {
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Room: {roomId}</CardTitle>
-              <Badge variant={isConnected ? "default" : "destructive"}>
-                {isConnected ? "Connected" : "Disconnected"}
-              </Badge>
+              <div className="flex space-x-2">
+                <Badge variant={isConnected ? "default" : "destructive"}>
+                  {isConnected ? "Connected" : "Disconnected"}
+                </Badge>
+                {connectionError && (
+                  <Badge variant="destructive">Server Error</Badge>
+                )}
+              </div>
             </div>
             <div className="flex space-x-2">
               {users.map((user, index) => (
@@ -282,7 +332,9 @@ export default function Room() {
                     value={mediaUrl}
                     onChange={(e) => setMediaUrl(e.target.value)}
                   />
-                  <Button onClick={shareMedia}>Share</Button>
+                  <Button onClick={shareMedia} disabled={!isConnected}>
+                    Share
+                  </Button>
                 </div>
 
                 <div>
@@ -296,6 +348,7 @@ export default function Room() {
                   <Button
                     onClick={() => fileInputRef.current?.click()}
                     className="w-full"
+                    disabled={!isConnected}
                   >
                     Upload File
                   </Button>
@@ -305,6 +358,7 @@ export default function Room() {
                   onClick={isScreenSharing ? stopScreenShare : startScreenShare}
                   className="w-full"
                   variant={isScreenSharing ? "destructive" : "default"}
+                  disabled={!isConnected}
                 >
                   {isScreenSharing ? "Stop Screen Share" : "Share Screen"}
                 </Button>
@@ -321,6 +375,9 @@ export default function Room() {
                 </p>
                 <p className="text-sm text-gray-600 mt-2">
                   {users.length} user{users.length !== 1 ? "s" : ""} connected
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Server: {isConnected ? "Online" : "Offline"}
                 </p>
               </CardContent>
             </Card>
