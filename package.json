@@ -1,7 +1,8 @@
 {
   "name": "watch-party-platform",
   "version": "0.1.0",
-  "private": true,
+  "description": "Real-time watch party platform",
+  "main": "server.js",
   "scripts": {
     "dev": "node server.js",
     "build": "next build",
